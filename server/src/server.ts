@@ -7,7 +7,7 @@
 import {
 	IPCMessageReader, IPCMessageWriter, createConnection, IConnection, TextDocuments, TextDocument, 
 	Diagnostic, DiagnosticSeverity, InitializeResult, TextDocumentPositionParams, CompletionItem, 
-	CompletionItemKind
+	CompletionItemKind, Hover, SignatureHelp, Location, Range
 } from 'vscode-languageserver';
 
 // Create a connection for the server. The connection uses Node's IPC as a transport
@@ -32,7 +32,12 @@ connection.onInitialize((params): InitializeResult => {
 			// Tell the client that the server support code complete
 			completionProvider: {
 				resolveProvider: true
-			}
+			},
+			hoverProvider: true,
+			signatureHelpProvider: {
+				triggerCharacters: ['(']
+			},
+			definitionProvider: true
 		}
 	}
 });
@@ -45,7 +50,7 @@ documents.onDidChangeContent((change) => {
 
 // The settings interface describe the server relevant settings part
 interface Settings {
-	lspSample: ExampleSettings;
+	screeps: ExampleSettings;
 }
 
 // These are the example settings we defined in the client's package.json
@@ -60,11 +65,12 @@ let maxNumberOfProblems: number;
 // as well.
 connection.onDidChangeConfiguration((change) => {
 	let settings = <Settings>change.settings;
-	maxNumberOfProblems = settings.lspSample.maxNumberOfProblems || 100;
+	maxNumberOfProblems = settings.screeps.maxNumberOfProblems || 100;
 	// Revalidate any open text documents
 	documents.all().forEach(validateTextDocument);
 });
 
+// syntax checking and validation example
 function validateTextDocument(textDocument: TextDocument): void {
 	let diagnostics: Diagnostic[] = [];
 	let lines = textDocument.getText().split(/\r?\n/g);
@@ -94,6 +100,38 @@ connection.onDidChangeWatchedFiles((_change) => {
 	connection.console.log('We recevied an file change event');
 });
 
+connection.onHover((_textDocumentPosition: TextDocumentPositionParams): Hover => {
+	return {
+		contents: 'test'
+	}
+});
+
+connection.onDefinition((_textDocumentPosition: TextDocumentPositionParams): Location => {
+	return Location.create(_textDocumentPosition.textDocument.uri, Range.create(_textDocumentPosition.position, _textDocumentPosition.position))
+});
+
+connection.onSignatureHelp((_textDocumentPosition: TextDocumentPositionParams): SignatureHelp => {
+	return{
+		activeSignature: 0,
+		activeParameter: 0,
+		signatures: [
+			{
+				label: 'room',
+				documentation: '```test docs```',
+				parameters: [
+					{
+						label: 'param 1',
+						documentation: 'first param docs'
+					},
+					{
+						label: 'param 2',
+						documentation: 'second param docs'
+					}
+				]
+			}
+		]
+	}
+});
 
 // This handler provides the initial list of the completion items.
 connection.onCompletion((_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
@@ -104,12 +142,19 @@ connection.onCompletion((_textDocumentPosition: TextDocumentPositionParams): Com
 		{
 			label: 'TypeScript',
 			kind: CompletionItemKind.Text,
-			data: 1
+			detail: "typescript details",
+			documentation: 'typescript docs'
 		},
 		{
 			label: 'JavaScript',
 			kind: CompletionItemKind.Text,
 			data: 2
+		},
+		{
+			label: 'Room',
+			kind: CompletionItemKind.Class,
+			detail: "screeps room",
+			documentation: 'room docs'
 		}
 	]
 });
@@ -118,7 +163,7 @@ connection.onCompletion((_textDocumentPosition: TextDocumentPositionParams): Com
 // the completion list.
 connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
 	if (item.data === 1) {
-		item.detail = 'TypeScript details',
+		//item.detail = 'TypeScript details',
 			item.documentation = 'TypeScript documentation'
 	} else if (item.data === 2) {
 		item.detail = 'JavaScript details',
